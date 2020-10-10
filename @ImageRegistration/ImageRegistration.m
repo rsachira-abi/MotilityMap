@@ -68,7 +68,7 @@ classdef ImageRegistration < handle
     %% Private methods
     methods (Access = public)
         
-        [fieldsX, fieldsY] = calcDisplacementFields (this, target_grads)
+        [fieldsX, fieldsY, error] = calcDisplacementFields (this, target_grads)
         
         [intX, intY, intError] = calcIntegerShift (this, cPaddedTemplateGrad, cPaddedTargetGrad, cPoints, cDispX, cDispY)
         
