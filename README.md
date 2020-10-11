@@ -10,6 +10,10 @@ Run the script `AnalyzeVideoSegment` and provide the following inputs.
         Enter start frame number: 1
         Enter end frame number: 293
         % Crop the frame to include the contracting region.
-        % Select the boundary within the intestine.
+        % Select the boundary within the region of interest.
+        % 1. Mark the top boundary first. (right click when you are done)
+        % 2. Mark the right boundary (right click to indicate done)
+        % 3. Mark the bottom boundary
+        % 4. Mark the left boundary
  
  
