@@ -50,13 +50,18 @@ classdef FiniteElementStrainCalculator
         % NodePoints : Node locations at different timesteps
         %              [X, Y] x timestep.
         %-------------------------------------------------------------------
-        function this = FiniteElementStrainCalculator (n, look_ahead)
+        function this = FiniteElementStrainCalculator (n, look_ahead, displacement_fields, max_weight)
             if (nargin >= 1)
                 this.n = n;
             end
-            if (nargin == 2)
+            if (nargin >= 2)
                 this.LOOK_AHEAD = look_ahead;
             end
+            if (nargin > 3)
+                this.DisplacementFields = displacement_fields;
+                this.MaxWeight = max_weight;
+            end
+            
             this.m = this.n - this.k + 1;
         end
         
