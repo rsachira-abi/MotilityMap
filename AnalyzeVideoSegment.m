@@ -22,7 +22,7 @@ NumElements = input('Enter number of elements: ');
 
 Optimize = (LookAhead > 1);
 
-fem = FiniteElementStrainCalculator(NumElements, LookAhead);
+% ffd = FreeFormDefStrainCalculator(NumElements, LookAhead);
 
 %% Process video
 
@@ -65,23 +65,100 @@ NumFrames = length(FrameList);
 [MeshX, MeshY] = meshgrid(128:60:(Width - 128), 128:60:(Height - 128));
 PointGrid = [MeshX(:), MeshY(:)];
 
-fem = fem.GenerateDisplacementFields(PointGrid, @(i)FrameList{i}, NumFrames);
+reg = ImageRegistration(FrameList{1}, PointGrid);
+
+DisplacementFields = cell(NumFrames, 4);
+
+mkdir('tmp');
+
+sz = reg.getTemplateSize();
+Queue = complex(double.empty(sz(1), sz(2), 0));
+QueueIndx = int16.empty(1, 0);
+qLength = 0;
+TemplateIndx = 0;
+max_weight = 0;
+
+for i = 1:NumFrames
+    FrameName = num2str(i);
+    disp(['Frame = ', FrameName]);
+    
+    cacheFile = fullfile('tmp', [FrameName, '.mat']);
+    if ~isfile(cacheFile)
+        target = FrameList{i};
+        %target = imcrop(target, rect);
+        %[target, ~] = undistortImage(target, cameraParams, 'OutputView', 'full');
+        target_grad = reg.grad(target);
+        [padded_target_grad, ~] = reg.padArray(target_grad, []);
+        
+        save(cacheFile, 'padded_target_grad')
+    else
+        load(cacheFile, 'padded_target_grad');
+    end
+    
+    if (qLength < LookAhead)
+        qLength = qLength + 1;
+        Queue(:,:,qLength) = padded_target_grad;
+        QueueIndx(qLength) = i;
+        disp(['--- Added, length = ', num2str(qLength)]);
+    end
+    
+    if (qLength == LookAhead)
+        disp('--- Processing');
+        [Fx, Fy, error] = reg.calcDisplacementFields(Queue);
+        weight = 1 ./ error;
+        weight(weight > 1) = 1;
+        max_weight = max(weight);
+        
+        TemplateIndx = TemplateIndx + 1;
+        DisplacementFields{TemplateIndx, 1} = Fx;
+        DisplacementFields{TemplateIndx, 2} = Fy;
+        DisplacementFields{TemplateIndx, 3} = QueueIndx;
+        DisplacementFields{TemplateIndx, 4} = weight;
+        
+        Queue(:,:,1) = [];
+        QueueIndx(1) = [];
+        qLength = qLength - 1;
+        disp(['--- Removed, length = ', num2str(qLength)]);
+    end
+end
+
+while (qLength > 0)
+    disp('--- Processing');
+    [Fx, Fy, error] = reg.calcDisplacementFields(Queue);
+    weight = 1 ./ error;
+    weight(weight > 1) = 1;
+    max_weight = max(weight);
+    
+    TemplateIndx = TemplateIndx + 1;
+    DisplacementFields{TemplateIndx, 1} = Fx;
+    DisplacementFields{TemplateIndx, 2} = Fy;
+    DisplacementFields{TemplateIndx, 3} = QueueIndx;
+    DisplacementFields{TemplateIndx, 4} = weight;
+    
+    Queue(:,:,1) = [];
+    QueueIndx(1) = [];
+    qLength = qLength - 1;
+    disp(['--- Removed, length = ', num2str(qLength)]);
+end
+
+% ffd = ffd.GenerateDisplacementFields(PointGrid, @(i)FrameList{i}, NumFrames);
 
 %% Specify boundary
 
 figure, imshow(FrameList{1});
 
-TopBoundary = FiniteElementStrainCalculator.SelectBoundary(2000);
-RightBoundary = FiniteElementStrainCalculator.SelectBoundary(2000, TopBoundary(end,1), TopBoundary(end,2));
-BottomBoundary = FiniteElementStrainCalculator.SelectBoundary(2000, RightBoundary(end,1), RightBoundary(end,2));
-LeftBoundary = FiniteElementStrainCalculator.SelectBoundary(2000, BottomBoundary(end,1), BottomBoundary(end,2), TopBoundary(1,1), TopBoundary(1,2));
-%%
-fem = fem.FitInitialMesh({TopBoundary, RightBoundary, BottomBoundary, LeftBoundary});
+TopBoundary = FreeFormDefStrainCalculator.SelectBoundary(2000);
+RightBoundary = FreeFormDefStrainCalculator.SelectBoundary(2000, TopBoundary(end,1), TopBoundary(end,2));
+BottomBoundary = FreeFormDefStrainCalculator.SelectBoundary(2000, RightBoundary(end,1), RightBoundary(end,2));
+LeftBoundary = FreeFormDefStrainCalculator.SelectBoundary(2000, BottomBoundary(end,1), BottomBoundary(end,2), TopBoundary(1,1), TopBoundary(1,2));
+
+ffd = FreeFormDefStrainCalculator(11, LookAhead, DisplacementFields, max_weight);
+ffd = ffd.FitInitialMesh({TopBoundary, RightBoundary, BottomBoundary, LeftBoundary});
 
 %% Fit to deformation
 
 tic
-[Px, Py] = fem.OptimizeMeshDeformation(NumFrames, [], [], Optimize, LookAhead);
+[Px, Py] = ffd.OptimizeMeshDeformation(NumFrames, [], [], Optimize, LookAhead);
 toc
 
 % Save cache
@@ -98,8 +175,8 @@ vout = VideoWriter([vFile, '.output.avi']);
 vout.FrameRate = 15;
 open(vout);
 
-ValRangeX = 1:0.2:(fem.m - 1);
-ValRangeY = 1:0.5:(fem.m - 1);
+ValRangeX = 1:0.2:(ffd.m - 1);
+ValRangeY = 1:0.5:(ffd.m - 1);
 [MatMeshX, MatMeshY] = meshgrid(ValRangeX, ValRangeY);
 MaterialPoints = [MatMeshX(:), MatMeshY(:)];
 
@@ -121,14 +198,14 @@ for i = 1:NumFrames
     Px2 = Px(:,i);
     Py2 = Py(:,i);
     
-    [X, Y] = fem.ExtractBoundary(Px2, Py2);
+    [X, Y] = ffd.ExtractBoundary(Px2, Py2);
     
-    [E, lambda] = fem.CalculateStrain(Px2, Py2, MaterialPoints);
+    [E, lambda] = ffd.CalculateStrain(Px2, Py2, MaterialPoints);
 
     if isempty(NN)
-        [X_, Y_, NN] = fem.CalculatePoint(MaterialPoints(:,1), MaterialPoints(:,2), Px2, Py2);
+        [X_, Y_, NN] = ffd.CalculatePoint(MaterialPoints(:,1), MaterialPoints(:,2), Px2, Py2);
     else
-        [X_, Y_, ~] = fem.CalculatePoint(MaterialPoints(:,1), MaterialPoints(:,2), Px2, Py2, NN);
+        [X_, Y_, ~] = ffd.CalculatePoint(MaterialPoints(:,1), MaterialPoints(:,2), Px2, Py2, NN);
     end
     
     I = insertMarker(I, [X, Y], '*', 'Color', 'yellow');
@@ -151,17 +228,17 @@ close(vout);
 
 %% Generate strain map
 
-keyboard; % Are you sure?
+%keyboard; % Are you sure?
 
-clearvars -except fem Px Py StartFrameNum EndFrameNum NumFrames
+clearvars -except ffd Px Py StartFrameNum EndFrameNum NumFrames strain_indx
 %load([vFile, 'cache.mat'], 'Px', 'Py');
 
 [tFile, tPath] = uigetfile;
 load(fullfile(tPath, tFile));
 
-ValRangeX = 1:0.05:(fem.m - 1);
-%ValRangeY = 1:0.1:(fem.m - 1);
-ValRangeY = (fem.m - 2):0.1:(fem.m - 1);
+ValRangeX = 1:0.05:(ffd.m - 1);
+ValRangeY = 1:0.1:(ffd.m - 1);
+%ValRangeY = 5:0.1:6; %4:0.1:5; %(ffd.m - 2):0.1:(ffd.m - 1);
 
 tvec = timevec(StartFrameNum:EndFrameNum);
 
@@ -176,7 +253,7 @@ for t = 1:NumFrames
     Px2 = Px(:,t);
     Py2 = Py(:,t);
     
-    [E, lambda] = fem.CalculateStrain(Px2, Py2, MaterialPoints);
+    [E, lambda] = ffd.CalculateStrain(Px2, Py2, MaterialPoints);
     
     StrainX_2D = reshape(lambda(:,1), length(ValRangeY), length(ValRangeX));
     StrainY_2D = reshape(lambda(:,2), length(ValRangeY), length(ValRangeX));
@@ -187,7 +264,12 @@ end
 
 %% Display strain map
 
-StrainMap = StrainMapY;
+if (strain_indx == 2)
+    StrainMap = StrainMapY;
+else
+    StrainMap = StrainMapX;
+end
+
 Ref = tvec(1);
 tvec = tvec - Ref;
 
@@ -281,7 +363,7 @@ I = FrameList{frame_num};
 Px2 = Px(:,frame_num);
 Py2 = Py(:,frame_num);
 
-[X, Y] = fem.ExtractBoundary(Px2, Py2);
+[X, Y] = ffd.ExtractBoundary(Px2, Py2);
 
 I = insertMarker(I, [X, Y], '*', 'Color', 'yellow');
 
@@ -329,14 +411,14 @@ vout.FrameRate = 15;
 open(vout);
 
 % X boundary lines
-[MeshX, MeshY] = meshgrid(1:0.01:(fem.m - 1), 1:(fem.m - 1));
+[MeshX, MeshY] = meshgrid(1:0.01:(ffd.m - 1), 1:(ffd.m - 1));
 BoundaryMaterial = [MeshX(:), MeshY(:)];
 
 % Y boundary lines
-[MeshX, MeshY] = meshgrid(1:(fem.m - 1), 1:0.01:(fem.m - 1));
+[MeshX, MeshY] = meshgrid(1:(ffd.m - 1), 1:0.01:(ffd.m - 1));
 BoundaryMaterial = [BoundaryMaterial; MeshX(:), MeshY(:)];
 
-%clearvars -except fem Px Py StartFrameNum EndFrameNum NumFrames BoundaryMaterial
+%clearvars -except ffd Px Py StartFrameNum EndFrameNum NumFrames BoundaryMaterial
 %load([vFile, 'cache.mat'], 'Px', 'Py');
 
 [tFile, tPath] = uigetfile;
@@ -355,11 +437,11 @@ for t = 1:NumFrames
     Px2 = Px(:,t);
     Py2 = Py(:,t);
     
-    [E, lambda] = fem.CalculateStrain(Px2, Py2, BoundaryMaterial);
+    [E, lambda] = ffd.CalculateStrain(Px2, Py2, BoundaryMaterial);
     if isempty(NN)
-        [X_, Y_, NN] = fem.CalculatePoint(BoundaryMaterial(:,1), BoundaryMaterial(:,2), Px2, Py2);
+        [X_, Y_, NN] = ffd.CalculatePoint(BoundaryMaterial(:,1), BoundaryMaterial(:,2), Px2, Py2);
     else
-        [X_, Y_, ~] = fem.CalculatePoint(BoundaryMaterial(:,1), BoundaryMaterial(:,2), Px2, Py2, NN);
+        [X_, Y_, ~] = ffd.CalculatePoint(BoundaryMaterial(:,1), BoundaryMaterial(:,2), Px2, Py2, NN);
     end
     
     I = cat(3, FrameList{t}, FrameList{t}, FrameList{t});
@@ -387,18 +469,18 @@ Px2 = Px(:,frame_num);
 Py2 = Py(:,frame_num);
 
 % X boundary lines
-[MeshX, MeshY] = meshgrid(1:0.01:(fem.m - 1), 1:(fem.m - 1));
+[MeshX, MeshY] = meshgrid(1:0.01:(ffd.m - 1), 1:(ffd.m - 1));
 BoundaryMaterial = [MeshX(:), MeshY(:)];
 
 % Y boundary lines
-[MeshX, MeshY] = meshgrid(1:(fem.m - 1), 1:0.01:(fem.m - 1));
+[MeshX, MeshY] = meshgrid(1:(ffd.m - 1), 1:0.01:(ffd.m - 1));
 BoundaryMaterial = [BoundaryMaterial; MeshX(:), MeshY(:)];
 
-[E, lambda] = fem.CalculateStrain(Px2, Py2, BoundaryMaterial);
+[E, lambda] = ffd.CalculateStrain(Px2, Py2, BoundaryMaterial);
 if isempty(NN)
-    [X_, Y_, NN] = fem.CalculatePoint(BoundaryMaterial(:,1), BoundaryMaterial(:,2), Px2, Py2);
+    [X_, Y_, NN] = ffd.CalculatePoint(BoundaryMaterial(:,1), BoundaryMaterial(:,2), Px2, Py2);
 else
-    [X_, Y_, ~] = fem.CalculatePoint(BoundaryMaterial(:,1), BoundaryMaterial(:,2), Px2, Py2, NN);
+    [X_, Y_, ~] = ffd.CalculatePoint(BoundaryMaterial(:,1), BoundaryMaterial(:,2), Px2, Py2, NN);
 end
 
 

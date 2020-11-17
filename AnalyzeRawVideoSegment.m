@@ -27,14 +27,16 @@ vFile = input('Enter name for the video outputs (eg: exp1.avi): ', 's');
 
 all_files = dir(fullfile(vPath, '*.raw'));
 all_files = struct2cell(all_files);
+all_files = cellfun(@extractFrameNumCellFunc , all_files(1,:));
+all_files = sort(all_files);
 
 StartFrameNum = input('Enter start frame number: ');
 EndFrameNum = input('Enter end frame number: ');
 
 FirstFrame = ImageRegistration.ImportRaw(fullfile(vPath, [num2str(StartFrameNum), '.raw']));
-StartFrameIndx = find(contains(all_files(1,:), num2str(StartFrameNum)));
-EndFrameIndx = find(contains(all_files(1,:), num2str(EndFrameNum)));
-FrameNameList = all_files(1, StartFrameIndx:EndFrameIndx);
+StartFrameIndx = find(all_files == StartFrameNum);
+EndFrameIndx = find(all_files == EndFrameNum);
+FrameNameList = all_files(StartFrameIndx:EndFrameIndx);
 
 % Crop frames
 [FirstFrame, rect] = imcrop(FirstFrame);
@@ -64,7 +66,7 @@ TemplateIndx = 0;
 max_weight = 0;
 
 for i = 1:NumFrames
-    FrameName = FrameNameList{i};
+    FrameName = [num2str(FrameNameList(i)), '.raw'];
     disp(['Frame = ', FrameName]);
     
     cacheFile = fullfile('tmp', [FrameName, '.mat']);
@@ -130,18 +132,18 @@ end
 
 figure, imshow(FirstFrame);
 
-TopBoundary = FiniteElementStrainCalculator.SelectBoundary(2000);
-RightBoundary = FiniteElementStrainCalculator.SelectBoundary(2000, TopBoundary(end,1), TopBoundary(end,2));
-BottomBoundary = FiniteElementStrainCalculator.SelectBoundary(2000, RightBoundary(end,1), RightBoundary(end,2));
-LeftBoundary = FiniteElementStrainCalculator.SelectBoundary(2000, BottomBoundary(end,1), BottomBoundary(end,2), TopBoundary(1,1), TopBoundary(1,2));
+TopBoundary = FreeFormDefStrainCalculator.SelectBoundary(2000);
+RightBoundary = FreeFormDefStrainCalculator.SelectBoundary(2000, TopBoundary(end,1), TopBoundary(end,2));
+BottomBoundary = FreeFormDefStrainCalculator.SelectBoundary(2000, RightBoundary(end,1), RightBoundary(end,2));
+LeftBoundary = FreeFormDefStrainCalculator.SelectBoundary(2000, BottomBoundary(end,1), BottomBoundary(end,2), TopBoundary(1,1), TopBoundary(1,2));
 
-fem = FiniteElementStrainCalculator(11, LookAhead, DisplacementFields, max_weight);
-fem = fem.FitInitialMesh({TopBoundary, RightBoundary, BottomBoundary, LeftBoundary});
+ffd = FreeFormDefStrainCalculator(11, LookAhead, DisplacementFields, max_weight);
+ffd = ffd.FitInitialMesh({TopBoundary, RightBoundary, BottomBoundary, LeftBoundary});
 
 %% Fit to deformation
 
 tic
-[Px, Py] = fem.OptimizeMeshDeformation(NumFrames, [], [], Optimize, LookAhead);
+[Px, Py] = ffd.OptimizeMeshDeformation(NumFrames, [], [], Optimize, LookAhead);
 toc
 
 % Save cache
@@ -150,12 +152,17 @@ save(fullfile('output', [vFile, 'cache.mat']), '-v7.3');
 
 %% Generate deformation video
 
+disp([newline, newline]);
+disp('1: Longitudinal strain');
+disp('2: Transverse strain');
+strain_indx = input('What strain do you want to plot? ');
+
 vout = VideoWriter(fullfile('output', [vFile, '.output.avi']));
 vout.FrameRate = 15;
 open(vout);
 
-ValRangeX = 1:0.2:(fem.m - 1);
-ValRangeY = 1:0.2:(fem.m - 1);
+ValRangeX = 1:0.2:(ffd.m - 1);
+ValRangeY = 1:0.2:(ffd.m - 1);
 [MatMeshX, MatMeshY] = meshgrid(ValRangeX, ValRangeY);
 MaterialPoints = [MatMeshX(:), MatMeshY(:)];
 
@@ -164,40 +171,42 @@ MaxVal = 50;
 
 NN = [];
 
-figure;
+cl = [-0.4, 0.4];
+center = -1 * cl(2) / (cl(1) - cl(2));
+mycolormap = customcolormap([0, center, 1], [1, 0, 0; 1, 1, 1; 0, 0, 1]);
+
+fig = figure;
+
 for i = 1:NumFrames
-    I = ImageRegistration.ImportRaw(fullfile(vPath, FrameNameList{i}));
+    I = ImageRegistration.ImportRaw(fullfile(vPath, [num2str(FrameNameList(i)), '.raw']));
     I(I > 1) = 1;
     I = imcrop(I, rect);
     
     Px2 = Px(:,i);
     Py2 = Py(:,i);
     
-    [X, Y] = fem.ExtractBoundary(Px2, Py2);
+    [X, Y] = ffd.ExtractBoundary(Px2, Py2);
     
-    E = fem.CalculateStrain(Px2, Py2, MaterialPoints);
+    [E, lambda] = ffd.CalculateStrain(Px2, Py2, MaterialPoints);
 
     if isempty(NN)
-        [X_, Y_, NN] = fem.CalculatePoint(MaterialPoints(:,1), MaterialPoints(:,2), Px2, Py2);
+        [X_, Y_, NN] = ffd.CalculatePoint(MaterialPoints(:,1), MaterialPoints(:,2), Px2, Py2);
     else
-        [X_, Y_, ~] = fem.CalculatePoint(MaterialPoints(:,1), MaterialPoints(:,2), Px2, Py2, NN);
+        [X_, Y_, ~] = ffd.CalculatePoint(MaterialPoints(:,1), MaterialPoints(:,2), Px2, Py2, NN);
     end
     
     I = insertMarker(I, [X, Y], '*', 'Color', 'yellow');
-    V = E(:,1);
-%     V(V > MaxVal) = MaxVal;
-%     V(V < MinVal) = MinVal;
-%     V = (V - MinVal) ./ (MaxVal - MinVal);
     
     imshow(I);
     hold on;
-    scatter(X_, Y_, 35, V);
-    colormap('jet');
-    caxis([MinVal, MaxVal]);
+    scatter(X_, Y_, 35, lambda(:,2), 'filled');
+    colormap(mycolormap);
     colorbar;
-    hold off;
+    caxis(cl);
+    drawnow;
+    f = getframe(fig);
     
-    f = getframe;
+    hold off;
     
     writeVideo(vout, f);
 end
@@ -206,18 +215,19 @@ close(vout);
 
 %% Generate strain map
 
-clearvars -except fem Px Py StartFrameNum EndFrameNum NumFrames
+clearvars -except ffd Px Py StartFrameIndx EndFrameIndx NumFrames strain_indx
 %load([vFile, 'cache.mat'], 'Px', 'Py');
 
 [tFile, tPath] = uigetfile;
 load(fullfile(tPath, tFile));
 
-ValRangeX = 1:0.01:(fem.m - 1);
-ValRangeY = (fem.m - 2):0.1:(fem.m - 1);
+ValRangeX = 1:0.01:(ffd.m - 1);
+ValRangeY = 6:0.1:(ffd.m - 1);
 
-tvec = timevec(StartFrameNum:EndFrameNum);
+tvec = timevec(StartFrameIndx:EndFrameIndx);
 
-StrainMap = zeros(NumFrames, length(ValRangeX));
+StrainMapX = zeros(NumFrames, length(ValRangeX));
+StrainMapY = zeros(NumFrames, length(ValRangeX));
 
 [MatMeshX, MatMeshY] = meshgrid(ValRangeX, ValRangeY);
 MaterialPoints = [MatMeshX(:), MatMeshY(:)];
@@ -227,27 +237,54 @@ for t = 1:NumFrames
     Px2 = Px(:,t);
     Py2 = Py(:,t);
     
-    E = fem.CalculateStrain(Px2, Py2, MaterialPoints);
+    [E, lambda] = ffd.CalculateStrain(Px2, Py2, MaterialPoints);
     
-    Stretch = E(:,1); %sqrt(2 .* E(:,1) + 1);
-    ZeroCenteredStretch = Stretch;% - 1;
+    StrainX_2D = reshape(lambda(:,1), length(ValRangeY), length(ValRangeX));
+    StrainY_2D = reshape(lambda(:,2), length(ValRangeY), length(ValRangeX));
     
-    ZeroCenteredStretch2D = reshape(ZeroCenteredStretch, length(ValRangeY), length(ValRangeX));
-    
-    StrainMap(t,:) = mean(ZeroCenteredStretch2D, 1);
+    StrainMapX(t,:) = nanmean(StrainX_2D, 1);
+    StrainMapY(t,:) = nanmean(StrainY_2D, 1);
 end
 
 %% Display strain map
 
-limit = min(abs(min(StrainMap(:))), max(StrainMap(:)));
+if (strain_indx == 2)
+    StrainMap = StrainMapY;
+else
+    StrainMap = StrainMapX;
+end
+
+Ref = tvec(1);
+tvec = tvec - Ref;
 
 figure;
 h = imagesc(StrainMap);
 set(h, 'YData', tvec);
-ylim([tvec(1), tvec(end)]);
+ylim([0, max(tvec)]);
 xlabel('Length along the small intestine');
 ylabel('Time (s)');
 
-colormap('jet');
-%caxis([-limit, limit]);
+cl = [-0.4, 0.4];%caxis; %[-0.0955, 0.1744];
+center = -1 * cl(2) / (cl(1) - cl(2));
+mycolormap = customcolormap([0, center, 1], [1, 0, 0; 1, 1, 1; 0, 0, 1]);
+colormap(mycolormap);
 colorbar;
+caxis(cl);
+
+%% Helper functions
+
+%--------------------------------------------------------------------------
+% extractFrameNumCellFunc
+% Designed to be run with cellfun(). Extract the numerical frame number
+% from the raw file listing names obtained with dir().
+%
+% Input:
+%           x = Name of a single raw file. e.g.: '100.raw'
+% Output:
+%           y = Frame number extracted from the raw file name. e.g.: 100
+%--------------------------------------------------------------------------
+function y = extractFrameNumCellFunc (x)
+    str_parts = split(x, '.');
+    y = str2double(str_parts{1});
+end
+

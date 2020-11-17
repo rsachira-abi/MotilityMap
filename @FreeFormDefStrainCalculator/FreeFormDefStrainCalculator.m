@@ -1,17 +1,15 @@
 %-------------------------------------------------------------------
-% FiniteElementStrainCalculator:
+% FreeFormDefStrainCalculator:
 %
 % Calculates the strain at each timestep given a set of node
 % locations at those timesteps. Node locations at the 0th timestep
 % is considered as the undeformed state.
 %
-% This class fits a bicubic Hermite mesh on to the node points and
-% use that to calculate the Green strain. Method given in paper:
+% This class models the 2D geometry of the object with a biquadratic
+% b-spline mesh, and use that to calculate the Green strain.
 %
-% Malcolm, D., Nielsen, P., Hunter, P. et al. Biomechan Model
-% Mechanobiol (2002) 1: 197. https://doi.org/10.1007/s10237-002-0018-8
 %-------------------------------------------------------------------
-classdef FiniteElementStrainCalculator
+classdef FreeFormDefStrainCalculator
     properties (Constant)
         % Configuration of the displacement fields.
         PIECE_SIZE = 10;
@@ -50,7 +48,7 @@ classdef FiniteElementStrainCalculator
         % NodePoints : Node locations at different timesteps
         %              [X, Y] x timestep.
         %-------------------------------------------------------------------
-        function this = FiniteElementStrainCalculator (n, look_ahead, displacement_fields, max_weight)
+        function this = FreeFormDefStrainCalculator (n, look_ahead, displacement_fields, max_weight)
             if (nargin >= 1)
                 this.n = n;
             end

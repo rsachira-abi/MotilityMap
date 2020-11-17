@@ -19,7 +19,7 @@ addpath('..');
 %addpath('../SourceFunctions/');
 
 %%
-fem = FiniteElementStrainCalculator(11);
+fem = FreeFormDefStrainCalculator(11);
 
 %% Process video
 
@@ -118,10 +118,10 @@ end
 
 figure, imshow(FirstFrame);
 
-TopBoundary = FiniteElementStrainCalculator.SelectBoundary(2000);
-RightBoundary = FiniteElementStrainCalculator.SelectBoundary(2000, TopBoundary(end,1), TopBoundary(end,2));
-BottomBoundary = FiniteElementStrainCalculator.SelectBoundary(2000, RightBoundary(end,1), RightBoundary(end,2));
-LeftBoundary = FiniteElementStrainCalculator.SelectBoundary(2000, BottomBoundary(end,1), BottomBoundary(end,2), TopBoundary(1,1), TopBoundary(1,2));
+TopBoundary = FreeFormDefStrainCalculator.SelectBoundary(2000);
+RightBoundary = FreeFormDefStrainCalculator.SelectBoundary(2000, TopBoundary(end,1), TopBoundary(end,2));
+BottomBoundary = FreeFormDefStrainCalculator.SelectBoundary(2000, RightBoundary(end,1), RightBoundary(end,2));
+LeftBoundary = FreeFormDefStrainCalculator.SelectBoundary(2000, BottomBoundary(end,1), BottomBoundary(end,2), TopBoundary(1,1), TopBoundary(1,2));
 
 fem = fem.FitInitialMesh({TopBoundary, RightBoundary, BottomBoundary, LeftBoundary});
 

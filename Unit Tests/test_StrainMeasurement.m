@@ -8,7 +8,7 @@ addpath('..');
 
 %% Zero error strain test
 
-fem = FiniteElementStrainCalculator(11);
+fem = FreeFormDefStrainCalculator(11);
 
 [DispFieldX, DispFieldY] = meshgrid(0:10:400, 0:10:400);
 
@@ -89,7 +89,7 @@ end
 
 %% Strain test without optimization
 
-fem = FiniteElementStrainCalculator(11);
+fem = FreeFormDefStrainCalculator(11);
 
 [DispFieldX, DispFieldY] = meshgrid(0:10:400, 0:10:400);
 
@@ -170,7 +170,7 @@ end
 
 %% Strain test with optimization
 
-fem = FiniteElementStrainCalculator(11);
+fem = FreeFormDefStrainCalculator(11);
 
 [DispFieldX, DispFieldY] = meshgrid(0:10:400, 0:10:400);
 
