@@ -237,7 +237,7 @@ clearvars -except ffd Px Py StartFrameNum EndFrameNum NumFrames strain_indx
 load(fullfile(tPath, tFile));
 
 ValRangeX = 1:0.05:(ffd.m - 1);
-ValRangeY = 1:0.1:(ffd.m - 1);
+ValRangeY = (ffd.m - 2):0.1:(ffd.m - 1);
 %ValRangeY = 5:0.1:6; %4:0.1:5; %(ffd.m - 2):0.1:(ffd.m - 1);
 
 tvec = timevec(StartFrameNum:EndFrameNum);
@@ -302,7 +302,7 @@ ylim([0, max(tvec)]);
 xlabel('Length along the small intestine');
 ylabel('Time (s)');
 
-cl = caxis; %[-0.0955, 0.1744];
+cl = [-0.01, 0.01];
 center = -1 * cl(2) / (cl(1) - cl(2));
 mycolormap = customcolormap([0, center, 1], [1, 0, 0; 1, 1, 1; 0, 0, 1]);
 colormap(mycolormap);

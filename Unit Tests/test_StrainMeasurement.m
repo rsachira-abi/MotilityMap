@@ -8,8 +8,6 @@ addpath('..');
 
 %% Zero error strain test
 
-fem = FreeFormDefStrainCalculator(11);
-
 [DispFieldX, DispFieldY] = meshgrid(0:10:400, 0:10:400);
 
 [MeshX, MeshY] = meshgrid(100:10:300, 100:10:300);
@@ -40,6 +38,7 @@ end
 
 NumFrames = length(PointGrid);
 
+fem = FreeFormDefStrainCalculator(11, 1, [], 1);
 fem = fem.GenerateDummyDisplacementFields3(PointGrid, NumFrames, 0, Disp);
 
 TopBoundary = [MeshX(1,:)', MeshY(1,:)'];
@@ -89,8 +88,6 @@ end
 
 %% Strain test without optimization
 
-fem = FreeFormDefStrainCalculator(11);
-
 [DispFieldX, DispFieldY] = meshgrid(0:10:400, 0:10:400);
 
 [MeshX, MeshY] = meshgrid(100:10:300, 100:10:300);
@@ -119,8 +116,11 @@ for i = 1:size(KnownStretch, 1)
     end
 end
 
+tic; % To measure measure time taken
+
 NumFrames = length(PointGrid);
 
+fem = FreeFormDefStrainCalculator(11, 1, [], 1);
 fem = fem.GenerateDummyDisplacementFields3(PointGrid, NumFrames, 0.1, Disp);
 
 TopBoundary = [MeshX(1,:)', MeshY(1,:)'];
@@ -130,9 +130,9 @@ LeftBoundary = [flipud(MeshX(:,1)), flipud(MeshY(:,1))];
 
 fem = fem.FitInitialMesh({TopBoundary, RightBoundary, BottomBoundary, LeftBoundary});
 
-tic
+%tic
 [Px, Py] = fem.OptimizeMeshDeformation(NumFrames, [], [], false, 10);
-toc
+%toc
 
 total_rms_error = 0;
 
@@ -160,6 +160,8 @@ end
 
 mean_rms = mean(total_rms_error);
 disp(['Mean RMS error = ', num2str(mean_rms)]);
+
+telapsed_unoptimized = toc
 
 try
     assert(mean_rms < 0.1);
@@ -170,8 +172,6 @@ end
 
 %% Strain test with optimization
 
-fem = FreeFormDefStrainCalculator(11);
-
 [DispFieldX, DispFieldY] = meshgrid(0:10:400, 0:10:400);
 
 [MeshX, MeshY] = meshgrid(100:10:300, 100:10:300);
@@ -200,8 +200,11 @@ for i = 1:size(KnownStretch, 1)
     end
 end
 
+tic; % To measure measure time taken
+
 NumFrames = length(PointGrid);
 
+fem = FreeFormDefStrainCalculator(11, 10, [], 1);
 fem = fem.GenerateDummyDisplacementFields3(PointGrid, NumFrames, 0.1, Disp);
 
 TopBoundary = [MeshX(1,:)', MeshY(1,:)'];
@@ -211,9 +214,9 @@ LeftBoundary = [flipud(MeshX(:,1)), flipud(MeshY(:,1))];
 
 fem = fem.FitInitialMesh({TopBoundary, RightBoundary, BottomBoundary, LeftBoundary});
 
-tic
+%tic
 [Px, Py] = fem.OptimizeMeshDeformation(NumFrames, [], [], true, 10);
-toc
+%toc
 
 total_rms_error = 0;
 
@@ -241,6 +244,8 @@ end
 
 mean_rms = mean(total_rms_error);
 disp(['Mean RMS error = ', num2str(mean_rms)]);
+
+telapsed_optimized = toc
 
 try
     assert(mean_rms < 0.1);

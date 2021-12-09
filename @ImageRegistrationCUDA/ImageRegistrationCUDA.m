@@ -3,16 +3,17 @@
 
 classdef ImageRegistrationCUDA < handle
     properties (Constant)
-        HalfCCSize = uint8(64);
-        CCSize = 129;
-        
-        SquareSize = uint8(3);
         PeakThreshold = 0.75;
-        
         GradKernel = [22/252,-67/252,-58/252,0,58/252,67/252,-22/252]; % SGD
     end
     
     properties (Access = private)
+        %% configuration
+        HalfCCSize = uint8(254); %uint8(64);
+        CCSize = 509; %129;
+        SquareSize = uint8(12);
+        
+        %% Other required variables
         cHamming2D = [];
         cHann2D = [];
         
@@ -28,7 +29,13 @@ classdef ImageRegistrationCUDA < handle
     %% Public methods
     methods (Access = public)
         
-        function this = ImageRegistrationCUDA (template, points)
+        function this = ImageRegistrationCUDA (template, points, HalfCCSize)
+            if (nargin == 3)
+                this.HalfCCSize = uint8(HalfCCSize);
+                this.CCSize = double(this.HalfCCSize * 2 + 1);
+                this.SquareSize = uint8(sqrt(this.CCSize / 4));
+            end
+            
             hamming2D = hamming(this.CCSize) * hamming(this.CCSize)';
             this.cHamming2D = gpuArray(hamming2D);
             
@@ -36,7 +43,8 @@ classdef ImageRegistrationCUDA < handle
             this.cHann2D = gpuArray(hann2D);
             
             % Matrix for plane fitting.
-            len = 61; %this.CCSize - (2 * round(this.CCSize * 0.25));
+            % len = 61; %this.CCSize - (2 * round(this.CCSize * 0.25));
+            len = this.CCSize - 6 + 1 - (2 * round(this.CCSize * 0.25)) + 1;
             [mX, mY] = meshgrid(1:len, 1:len);
             this.A = cat(2, mX(:), mY(:), ones(size(mX(:))));
             this.cA = gpuArray(this.A);
@@ -68,7 +76,7 @@ classdef ImageRegistrationCUDA < handle
     %% Private methods
     methods (Access = public)
         
-        [fieldsX, fieldsY] = calcDisplacementFields (this, target_grads)
+        [fieldsX, fieldsY, error] = calcDisplacementFields (this, target_grads)
         
         [intX, intY, intError] = calcIntegerShift (this, cPaddedTemplateGrad, cPaddedTargetGrad, cPoints, cDispX, cDispY, ThreadBlockSize)
         

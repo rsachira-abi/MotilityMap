@@ -5,7 +5,7 @@ function [fieldsX, fieldsY, error] = calcDisplacementFields (this, target_grads)
     error = [];
     
     for i = 1:size(target_grads,3)
-        cuda_target_grad = gpuArray(target_grads(:,:,i));
+        cuda_target_grad = target_grads(:,:,i); %gpuArray(target_grads(:,:,i));
         
         [intX, intY, intError] = this.calcIntegerShift(this.cPaddedTemplateGrad, cuda_target_grad, this.cPaddedPoints);
         
