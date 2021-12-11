@@ -5,10 +5,13 @@
 % numbers (inclusive).
 %--------------------------------------------------------------------------
 
+clear;
+clc;
+
 USE_CUDA = true;
 IS_RAW = false;
 
-project_dir = input('Project folder name: ');
+project_dir = input('Project folder name: ', 's');
 [vFile, vPath] = uigetfile('*.avi', 'Select the video file');
 
 %% Process video
@@ -34,7 +37,7 @@ Width = size(FirstFrame, 2);
 Height = size(FirstFrame, 1);
 
 [MeshX, MeshY] = meshgrid(128:30:(Width - 128), 128:30:(Height - 128));
-PointGrid = [MeshX(:), MeshY(:)];
+PointGrid = int32([MeshX(:), MeshY(:)]);
 
 if (USE_CUDA == true)
     reg = ImageRegistrationCUDA(FirstFrame, PointGrid, 64);
@@ -48,7 +51,7 @@ TemplateIndx = 0;
 max_weight = 0;
 
 for i = StartFrameNum:EndFrameNum
-    disp(['FrameNum = ', i]);
+    disp(['FrameNum = ', num2str(i)]);
     
     target = vin.read(i);
     target = im2double(rgb2gray(imcrop(target, rect)));

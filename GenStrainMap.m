@@ -5,18 +5,26 @@
 % AnalyzeVideoSegment.m
 %--------------------------------------------------------------------------
 
+clear;
+clc;
+
 project_path = uigetdir('', 'Select project directory');
 load(fullfile(project_path, 'strain_cache.mat'));
 
 [tFile, tPath] = uigetfile;
-load(fullfile(tPath, tFile));
+
+if (tFile == 0 && tPath == 0)
+    timevec = (1:EndFrameNum)';
+else
+    load(fullfile(tPath, tFile));
+end
 
 %% Generate strain map
 
 ValRangeX = 1:0.01:(ffd.m - 1);
-ValRangeY = 6:0.1:(ffd.m - 1);
+ValRangeY = 1:0.1:(ffd.m - 1);
 
-tvec = timevec(StartFrameIndx:EndFrameIndx);
+tvec = timevec(StartFrameNum:EndFrameNum);
 
 StrainMapX = zeros(NumFrames, length(ValRangeX));
 StrainMapY = zeros(NumFrames, length(ValRangeX));

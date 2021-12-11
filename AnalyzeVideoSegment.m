@@ -5,6 +5,9 @@
 % GenDisplacementFields*.m
 %--------------------------------------------------------------------------
 
+clear;
+clc;
+
 project_path = uigetdir('', 'Select project directory');
 load(fullfile(project_path, 'displacement_fields.mat'));
 
@@ -18,10 +21,16 @@ right_boundary = images.roi.Polyline(gca);
 bottom_boundary = images.roi.Polyline(gca);
 left_boundary = images.roi.Polyline(gca);
 
+disp('Draw boundaries. Backspace delete the last point. Right click indicate done.');
+
+disp('Draw top boundary. Right click when done.');
 top_boundary = drawpolyline;
 
+disp('Draw right boundary. Right click when done.');
 right_boundary.beginDrawingFromPoint(top_boundary.Position(end,:));
+disp('Draw bottom boundary. Right click when done.');
 bottom_boundary.beginDrawingFromPoint(right_boundary.Position(end,:));
+disp('Draw left boundary. Right click when done.');
 left_boundary.beginDrawingFromPoint(bottom_boundary.Position(end,:));
 
 ffd = FreeFormDefStrainCalculator(NumElements, 1, DisplacementFields, max_weight);
@@ -61,19 +70,20 @@ mycolormap = customcolormap([0, center, 1], [1, 0, 0; 1, 1, 1; 0, 0, 1]);
 
 if IS_RAW == true
     generateVideoFromRAW(vPath, FrameNameList, NumFrames, rect,...
-        @(frame, frame_num) outputFrame(vout, strain_indx, ffd, Px, Py, MaterialPoints, NN, NaN, mycolormap, frame, frame_num)...
+        @(frame, frame_num) outputFrame(vout, strain_indx, ffd, Px, Py, MaterialPoints, NN, NaN, mycolormap, cl, frame, frame_num)...
         );
 else
     generateVideoFromAVI(vPath, vFile, StartFrameNum, EndFrameNum, rect,...
-        @(frame, frame_num) outputFrame(vout, strain_indx, ffd, Px, Py, MaterialPoints, NN, NaN, mycolormap, frame, frame_num)...
+        @(frame, frame_num) outputFrame(vout, strain_indx, ffd, Px, Py, MaterialPoints, NN, NaN, mycolormap, cl, frame, frame_num)...
         );
 end
 
 vout.close();
 
-function outputFrame (vout, strain_indx, ffd, Px, Py, MaterialPoints, NN, timevec, mycolormap, frame, frame_num)
+function outputFrame (vout, strain_indx, ffd, Px, Py, MaterialPoints, NN, timevec, mycolormap, cl, frame, frame_num)
 % Generate the output frame for a given video frame
-    
+    disp(['Processing frame ', num2str(frame_num)]);
+
     time = -1;
     if ~isnan(timevec)
         time = timevec(frame_num);
@@ -96,10 +106,9 @@ function outputFrame (vout, strain_indx, ffd, Px, Py, MaterialPoints, NN, timeve
     col_indx(col_indx > size(mycolormap,1)) = size(mycolormap,1);
     col_indx = int32(col_indx);
     cols = mycolormap(col_indx, :);
-    frame = insertShape(frame, 'circle', [X_, Y_, ones(length(X_),1).*10], 'Color', cols .* 255);
+    frame = insertShape(frame, 'circle', [X_, Y_, ones(length(X_),1).*10], 'Color', cols);
 
-    vout.writeVideo(frame)
-
+    vout.writeVideo(frame);
 end
 
 %% Helper functions
@@ -128,7 +137,7 @@ function generateVideoFromAVI (vPath, vFile, StartFrameNum, EndFrameNum, rect, f
 
     for i = StartFrameNum:EndFrameNum
         I = vin.read(i);
-        I = im2double(rgb2gray(imcrop(I, rect)));
+        I = im2double(imcrop(I, rect));
 
         frameCallback(I, i);
     end

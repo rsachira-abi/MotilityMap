@@ -14,7 +14,7 @@ disp('Running test: Integer translation');
 [meshX, meshY] = meshgrid(70:30:size(template,2) - 70, 70:30:size(template,1) - 70);
 points = int32([meshX(:), meshY(:)]);
 
-reg = ImageRegistrationCUDA();
+reg = ImageRegistrationCUDA(template, points, 64);
 [gradTemp, points] = reg.padArray(reg.grad(template), points);
 [gradTarg, ~] = reg.padArray(reg.grad(target), points);
 
@@ -38,7 +38,7 @@ points = int32([meshX(:), meshY(:)]);
 
 Disp = zeros(size(points,1), 1);
 
-reg = ImageRegistrationCUDA();
+reg = ImageRegistrationCUDA(template, points, 64);
 [gradTemp, points] = reg.padArray(reg.grad(template), points);
 [gradTarg, ~] = reg.padArray(reg.grad(target), points);
 
@@ -65,7 +65,7 @@ Fields = cell(length(tr) + 1, 2);
 [meshX, meshY] = meshgrid(70:30:size(template,2) - 70, 70:30:size(template,1) - 70);
 points = int32([meshX(:), meshY(:)]);
 
-reg = ImageRegistrationCUDA(template, points);
+reg = ImageRegistrationCUDA(template, points, 64);
 
 sz = reg.getTemplateSize();
 Queue = complex(double.empty(sz(1), sz(2), 0));
