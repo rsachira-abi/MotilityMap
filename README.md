@@ -1,5 +1,11 @@
 # MotilityMap
 
+A full description of the MotilityMap method is available in the journal article: [High-Resolution Spatiotemporal Quantification of Intestinal Motility With Free-Form Deformation](https://ieeexplore.ieee.org/document/9652118). If you are using this method, please site the original paper:
+
+```
+S. Kuruppu et al., "High-Resolution Spatiotemporal Quantification of Intestinal Motility With Free-Form Deformation," in IEEE Transactions on Biomedical Engineering, vol. 69, no. 6, pp. 2077-2086, June 2022, doi: 10.1109/TBME.2021.3135855.
+```
+
 MotilityMap implementation in MATLAB. Tested on MATLAB version 2021b. The polygon region of interest selection tool (used to specify the boundary) may not be availabe in MATLAB versions R2019b and below.
 
 ## Downloading sample data
